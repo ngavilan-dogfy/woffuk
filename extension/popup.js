@@ -247,18 +247,13 @@ async function load() {
   statusLabel.textContent = isEnabled ? "ON" : "OFF";
   statusLabel.className = isEnabled ? "status-label on" : "status-label";
 
-  // Set initial state instantly (no transition)
-  document.body.style.transition = "none";
-  hdrCollapsible.style.transition = "none";
-  if (isEnabled) {
-    document.body.classList.remove("app-off");
-    hdrCollapsible.classList.remove("collapsed");
-  }
-  // Re-enable transitions after paint
+  // Sync visual state (no-transition class on body suppresses animations on first load)
+  document.body.classList.toggle("app-off", !isEnabled);
+  hdrCollapsible.classList.toggle("collapsed", !isEnabled);
+  // Enable transitions after first paint
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      document.body.style.transition = "";
-      hdrCollapsible.style.transition = "";
+      document.body.classList.remove("no-transition");
     });
   });
 
@@ -455,7 +450,7 @@ document.getElementById("exportLog").addEventListener("click", async () => {
     const d = new Date(e.time);
     const date = d.toLocaleDateString("es-ES");
     const time = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-    const tipo = e.type === "in" ? "Entrar" : "Salir";
+    const tipo = e.type === "in" ? "Entrar" : e.type === "out" ? "Salir" : "Fichaje";
     const res = e.success ? "OK" : "FAIL";
     const err = (e.error || "").replace(/,/g, ";");
     csv.push(`${date},${time},${tipo},${res},${err},${e.attempt}`);
@@ -498,7 +493,7 @@ function renderLog(log) {
     row.innerHTML = `
       <div class="lg-dot ${ok ? "ok" : "fail"}"></div>
       <span class="lg-time">${date} ${time}</span>
-      <span class="lg-msg">${entry.type === "in" ? "Entrar" : "Salir"}${attempt}${entry.error ? " — " + entry.error : ""}</span>
+      <span class="lg-msg">${entry.type === "in" ? "Entrar" : entry.type === "out" ? "Salir" : "Fichaje"}${attempt}${entry.error ? " — " + entry.error : ""}</span>
       <span class="lg-badge ${ok ? "ok" : "fail"}">${ok ? "OK" : "FAIL"}</span>
     `;
     logDiv.appendChild(row);

@@ -814,7 +814,8 @@
     .body, .foot {
       transition: opacity 0.35s ease,
                   transform 0.4s cubic-bezier(0.4,0,0.2,1),
-                  max-height 0.4s cubic-bezier(0.4,0,0.2,1);
+                  max-height 0.4s cubic-bezier(0.4,0,0.2,1),
+                  margin-top 0.4s cubic-bezier(0.4,0,0.2,1);
       transform-origin: top;
     }
 
@@ -832,8 +833,8 @@
       margin-top: 0;
     }
 
-    .body { max-height: 2000px; }
-    .foot { max-height: 100px; }
+    .body { max-height: 800px; }
+    .foot { max-height: 50px; }
 
     /* OFF message */
     .off-msg {
@@ -853,9 +854,18 @@
       max-height: 60px;
       opacity: 1;
     }
+
+    /* Suppress all transitions on first load */
+    .no-transition,
+    .no-transition *,
+    .no-transition *::before,
+    .no-transition *::after {
+      transition: none !important;
+      animation: none !important;
+    }
   </style>
 </head>
-<body class="app-off">
+<body class="app-off no-transition">
 
   <div class="toast" id="toast"><span id="toastMsg"></span></div>
 
