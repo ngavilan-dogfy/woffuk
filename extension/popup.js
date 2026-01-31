@@ -70,12 +70,17 @@ function setAppActive(on) {
   if (on) checkSession();
 }
 
+function setBodyVisible(visible) {
+  document.body.classList.toggle("app-off", !visible);
+}
+
 // ── Session check ──────────────────────────────────────
 function applySessionState(state) {
   const openUrl = woffuUrlInput.value.trim() || "https://dogfydiet.woffu.com";
   if (state === "ok") {
     sessionDot.className = "session-dot ok";
     sessionText.textContent = "Sesion activa";
+    setBodyVisible(true);
   } else {
     const text = state === "no_token" ? "Abre Woffu en una pestana"
                : state === "error" ? "Error de conexion"
@@ -90,6 +95,7 @@ function applySessionState(state) {
       e.preventDefault();
       checkSession();
     });
+    setBodyVisible(false);
   }
 }
 
@@ -250,7 +256,10 @@ async function load() {
   statusLabel.className = isEnabled ? "status-label on" : "status-label";
 
   // Sync visual state (no-transition class on body suppresses animations on first load)
-  document.body.classList.toggle("app-off", !isEnabled);
+  // If enabled, check cached session — only show body if session was "ok"
+  const { sessionState: cachedSession } = await chrome.storage.local.get("sessionState");
+  const showBody = isEnabled && cachedSession === "ok";
+  document.body.classList.toggle("app-off", !showBody);
   hdrCollapsible.classList.toggle("collapsed", !isEnabled);
   // Enable transitions after first paint
   requestAnimationFrame(() => {
