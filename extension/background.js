@@ -47,17 +47,30 @@ async function setupAlarms() {
 // ── Get token from Woffu tab's sessionStorage ───────────
 async function getWoffuToken() {
   try {
-    // Find a Woffu tab
     let tabs = await chrome.tabs.query({ url: "https://*.woffu.com/*" });
     if (tabs.length === 0) return null;
 
-    // Read sessionStorage.token (SYNC function — no async)
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tabs[0].id },
-      func: () => sessionStorage.getItem("token")
-    });
+    // Try all Woffu tabs (after Google Auth redirect, the active tab may differ)
+    for (const tab of tabs) {
+      try {
+        // Skip tabs that are still loading (e.g. mid-redirect)
+        if (tab.status !== "complete") continue;
 
-    return results?.[0]?.result || null;
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: "MAIN",
+          func: () => sessionStorage.getItem("token")
+        });
+
+        const token = results?.[0]?.result;
+        if (token) return token;
+      } catch (e) {
+        // Tab may be restricted (chrome://, devtools, etc.) — skip it
+        console.log(`[Woffuk] Skipping tab ${tab.id}: ${e.message}`);
+      }
+    }
+
+    return null;
   } catch (err) {
     console.log("[Woffuk] getWoffuToken error:", err.message);
     return null;
@@ -83,7 +96,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
   const window = timeWindow ?? DEFAULT_TIME_WINDOW;
   const maxOffset = randomOffset ?? DEFAULT_RANDOM_OFFSET;
-  const todayKey = now.toISOString().slice(0, 10);
+  const todayKey = todayStr;
   const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
   const triggeredMap = (triggered && triggered._date === todayKey) ? triggered : { _date: todayKey };
 
@@ -116,7 +129,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
     console.log(`[Woffuk] Triggering ${entry.type} at ${entry.hour}:${String(entry.minute).padStart(2, "0")} (actual: ${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")})`);
 
-    const success = await triggerSignWithRetry();
+    const success = await triggerSignWithRetry(entry.type);
 
     triggeredMap[entryKey] = { time: now.toISOString(), success };
     await chrome.storage.local.set({ triggered: triggeredMap });
@@ -131,11 +144,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 // ── API call with retries ──────────────────────────────
-async function triggerSignWithRetry() {
+async function triggerSignWithRetry(signType) {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     console.log(`[Woffuk] Attempt ${attempt}/${MAX_RETRIES}`);
     const result = await triggerSign();
-    await appendLog(result.type || "sign", result.success, result.error, attempt);
+    await appendLog(signType || "sign", result.success, result.error, attempt);
     if (result.success) return true;
     if (attempt < MAX_RETRIES) await sleep(RETRY_DELAY_MS);
   }
@@ -214,13 +227,22 @@ chrome.storage.onChanged.addListener((changes) => {
 // Message handler from popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "manualTrigger") {
-    triggerSign().then(sendResponse);
+    (async () => {
+      const result = await triggerSign();
+      await appendLog(msg.type || "sign", result.success, result.error, 1);
+      sendResponse(result);
+    })();
     return true;
   }
   if (msg.action === "checkSession") {
     (async () => {
       try {
-        const token = await getWoffuToken();
+        let token = await getWoffuToken();
+        // After Google Auth redirect the token may not be set yet — retry once
+        if (!token) {
+          await sleep(1500);
+          token = await getWoffuToken();
+        }
         if (!token) {
           sendResponse({ ok: false, reason: "no_token" });
           return;

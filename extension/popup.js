@@ -16,8 +16,14 @@ const sessionText = document.getElementById("sessionText");
 const nextClockEl = document.getElementById("nextClock");
 const nextClockText = document.getElementById("nextClockText");
 const holidayList = document.getElementById("holidayList");
+const hdrCollapsible = document.getElementById("hdrCollapsible");
+const offMsg = document.getElementById("offMsg");
 
 let holidays = [];
+
+function localDateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 // ── Collapsible sections ───────────────────────────────
 function setupCollapse(toggleId, bodyId) {
@@ -53,6 +59,13 @@ function showToast(text, type = "info") {
 function updateStatus(on) {
   statusLabel.textContent = on ? "ON" : "OFF";
   statusLabel.className = on ? "status-label on" : "status-label";
+  setAppActive(on);
+}
+
+function setAppActive(on) {
+  document.body.classList.toggle("app-off", !on);
+  hdrCollapsible.classList.toggle("collapsed", !on);
+  if (on) checkSession();
 }
 
 // ── Session check ──────────────────────────────────────
@@ -63,10 +76,14 @@ async function checkSession() {
 
   function showExpired(text) {
     sessionDot.className = "session-dot expired";
-    sessionText.innerHTML = `${text} — <a href="#" id="openWoffu">abrir Woffu</a>`;
+    sessionText.innerHTML = `${text} — <a href="#" id="openWoffu">abrir Woffu</a> · <a href="#" id="retrySession">reintentar</a>`;
     document.getElementById("openWoffu").addEventListener("click", (e) => {
       e.preventDefault();
       chrome.tabs.create({ url: openUrl });
+    });
+    document.getElementById("retrySession").addEventListener("click", (e) => {
+      e.preventDefault();
+      checkSession();
     });
   }
 
@@ -81,8 +98,7 @@ async function checkSession() {
       showExpired("Sesion expirada");
     }
   } catch {
-    sessionDot.className = "session-dot";
-    sessionText.textContent = "";
+    showExpired("Error de conexion");
   }
 }
 
@@ -94,7 +110,7 @@ function updateNextClock(schedule, triggered, enabled) {
   }
 
   const now = new Date();
-  const todayKey = now.toISOString().slice(0, 10);
+  const todayKey = localDateKey(now);
   const triggeredMap = (triggered && triggered._date === todayKey) ? triggered : { _date: todayKey };
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
@@ -124,8 +140,8 @@ function updateNextClock(schedule, triggered, enabled) {
 // ── Today's status for entries ─────────────────────────
 function getEntryStatus(index, entry, triggered) {
   const now = new Date();
-  const todayKey = now.toISOString().slice(0, 10);
-  const triggeredMap = (triggered && triggered._date === todayKey) ? triggered : {};
+  const todayKey = localDateKey(now);
+  const triggeredMap = (triggered && triggered._date === todayKey) ? triggered : { _date: todayKey };
   const entryKey = `${index}_${entry.hour}_${entry.minute}_${entry.type}`;
   const result = triggeredMap[entryKey];
 
@@ -212,8 +228,19 @@ async function load() {
     "timeWindow", "randomOffset", "notifySuccess", "holidays", "triggered"
   ]);
 
-  enabledCb.checked = !!data.enabled;
-  updateStatus(!!data.enabled);
+  const isEnabled = !!data.enabled;
+  enabledCb.checked = isEnabled;
+  statusLabel.textContent = isEnabled ? "ON" : "OFF";
+  statusLabel.className = isEnabled ? "status-label on" : "status-label";
+
+  // Set initial state without transition
+  if (!isEnabled) {
+    document.body.classList.add("app-off");
+    hdrCollapsible.classList.add("collapsed");
+  } else {
+    document.body.classList.remove("app-off");
+    hdrCollapsible.classList.remove("collapsed");
+  }
 
   const days = data.activeDays || [1, 2, 3, 4, 5];
   daysContainer.querySelectorAll("input").forEach((cb) => {
@@ -241,8 +268,8 @@ async function load() {
 
   calcWorkedHours();
   renderLog(data.log || []);
-  updateNextClock(data.schedule, data.triggered, data.enabled);
-  checkSession();
+  updateNextClock(data.schedule, data.triggered, isEnabled);
+  if (isEnabled) checkSession();
 }
 
 // ── Schedule rows ──────────────────────────────────────
@@ -366,12 +393,17 @@ document.getElementById("save").addEventListener("click", async () => {
   updateStatus(enabled);
   showToast("Configuracion guardada", "ok");
 
+  const { triggered } = await chrome.storage.local.get("triggered");
   scheduleCard.innerHTML = "";
   if (schedule.length === 0) {
     scheduleCard.innerHTML = '<div class="sched-empty">Sin fichajes configurados</div>';
   } else {
-    schedule.forEach((entry, i) => addRow(entry, i * 50));
+    schedule.forEach((entry, i) => {
+      const status = getEntryStatus(i, entry, triggered);
+      addRow(entry, i * 50, status);
+    });
   }
+  updateNextClock(schedule, triggered, enabled);
 });
 
 // ── Test buttons ───────────────────────────────────────
