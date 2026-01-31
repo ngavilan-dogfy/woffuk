@@ -38,9 +38,11 @@ function setupCollapse(toggleId, bodyId) {
 setupCollapse("settingsToggle", "settingsBody");
 setupCollapse("logToggle", "logBody");
 
-// ── Toggle ON/OFF label live ──────────────────────────
-enabledCb.addEventListener("change", () => {
-  updateStatus(enabledCb.checked);
+// ── Toggle ON/OFF — persists immediately ────────────────
+enabledCb.addEventListener("change", async () => {
+  const on = enabledCb.checked;
+  await chrome.storage.local.set({ enabled: on });
+  updateStatus(on);
 });
 
 // ── Toast ──────────────────────────────────────────────
