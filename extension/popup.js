@@ -69,12 +69,15 @@ function setAppActive(on) {
 }
 
 // ── Session check ──────────────────────────────────────
-async function checkSession() {
-  sessionDot.className = "session-dot";
-  sessionText.textContent = "Comprobando...";
+function applySessionState(state) {
   const openUrl = woffuUrlInput.value.trim() || "https://dogfydiet.woffu.com";
-
-  function showExpired(text) {
+  if (state === "ok") {
+    sessionDot.className = "session-dot ok";
+    sessionText.textContent = "Sesion activa";
+  } else {
+    const text = state === "no_token" ? "Abre Woffu en una pestana"
+               : state === "error" ? "Error de conexion"
+               : "Sesion expirada";
     sessionDot.className = "session-dot expired";
     sessionText.innerHTML = `${text} — <a href="#" id="openWoffu">abrir Woffu</a> · <a href="#" id="retrySession">reintentar</a>`;
     document.getElementById("openWoffu").addEventListener("click", (e) => {
@@ -86,19 +89,30 @@ async function checkSession() {
       checkSession();
     });
   }
+}
+
+async function checkSession() {
+  // Show cached state instantly, then refresh in background
+  const { sessionState } = await chrome.storage.local.get("sessionState");
+  if (sessionState) {
+    applySessionState(sessionState);
+  } else {
+    sessionDot.className = "session-dot";
+    sessionText.textContent = "Comprobando...";
+  }
 
   try {
     const r = await chrome.runtime.sendMessage({ action: "checkSession" });
-    if (r?.ok) {
-      sessionDot.className = "session-dot ok";
-      sessionText.textContent = "Sesion activa";
-    } else if (r?.reason === "no_token") {
-      showExpired("Abre Woffu en una pestana");
-    } else {
-      showExpired("Sesion expirada");
-    }
+    let newState;
+    if (r?.ok) newState = "ok";
+    else if (r?.reason === "no_token") newState = "no_token";
+    else newState = "expired";
+
+    await chrome.storage.local.set({ sessionState: newState });
+    applySessionState(newState);
   } catch {
-    showExpired("Error de conexion");
+    await chrome.storage.local.set({ sessionState: "error" });
+    applySessionState("error");
   }
 }
 
