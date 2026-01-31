@@ -233,14 +233,20 @@ async function load() {
   statusLabel.textContent = isEnabled ? "ON" : "OFF";
   statusLabel.className = isEnabled ? "status-label on" : "status-label";
 
-  // Set initial state without transition
-  if (!isEnabled) {
-    document.body.classList.add("app-off");
-    hdrCollapsible.classList.add("collapsed");
-  } else {
+  // Set initial state instantly (no transition)
+  document.body.style.transition = "none";
+  hdrCollapsible.style.transition = "none";
+  if (isEnabled) {
     document.body.classList.remove("app-off");
     hdrCollapsible.classList.remove("collapsed");
   }
+  // Re-enable transitions after paint
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.body.style.transition = "";
+      hdrCollapsible.style.transition = "";
+    });
+  });
 
   const days = data.activeDays || [1, 2, 3, 4, 5];
   daysContainer.querySelectorAll("input").forEach((cb) => {
