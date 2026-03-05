@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Woffuk",
-  "version": "5.1",
+  "version": "1.0",
   "description": "Automatically clock in/out on Woffu at scheduled times",
   "permissions": [
     "alarms",
