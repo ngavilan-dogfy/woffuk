@@ -1,88 +1,125 @@
+<div align="center">
+
+<img src="extension/icon128.png" width="80" />
+
 # Woffuk
 
-Chrome extension that automatically clocks in and out on [Woffu](https://www.woffu.com) at scheduled times. Built for teams that use Woffu for time tracking and want to automate their daily sign-in/sign-out routine.
+**Automate your Woffu clock-in/out and manage all your requests — from one popup.**
+
+[![Chrome MV3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/)
+[![Vanilla JS](https://img.shields.io/badge/Vanilla-JS%20%2F%20HTML%20%2F%20CSS-F7DF1E?logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![Vibe Coded](https://img.shields.io/badge/%E2%9C%A8-vibe--coded-blueviolet)](#)
+[![Version](https://img.shields.io/badge/version-1.0-blue)](#)
+
+*100% vibe-coded with [Claude Code](https://claude.ai/claude-code). Zero dependencies. Pure vibes.*
+
+</div>
+
+---
+
+## What is this?
+
+A Chrome extension for teams using [Woffu](https://www.woffu.com) for time tracking. It automates your daily sign-in/sign-out routine and lets you batch-manage all 41 request types (Vacaciones, Teletrabajo, etc.) with an interactive calendar — all from a single popup.
 
 ## Features
 
-### Auto Clock-in/out
-- **Scheduled clock-in/out** — Define your work schedule (e.g. 08:00 in, 13:45 out, 14:30 in, 17:30 out) and Woffuk handles the rest.
-- **Per-day schedules** — Override the default schedule for specific days of the week (e.g. different hours on Fridays).
-- **Random offset** — Adds a configurable random delay (0–10 min) to each sign event for natural variation.
-- **Missed sign detection** — If your PC was asleep or off during a scheduled sign, Woffuk detects the missed window and notifies you.
-- **Server-side workday detection** — Automatically skips holidays and weekends using Woffu's own calendar API.
-- **Duplicate sign prevention** — Checks your current clock state before signing to avoid double entries.
-- **Retry logic** — Up to 3 automatic retries with a 3-second delay if a sign request fails.
+### :clock1: Auto Clock-in/out
+- **Scheduled signs** — Define your work schedule and Woffuk handles the rest
+- **Per-day overrides** — Different hours on Fridays? No problem
+- **Random offset** — Configurable random delay (0–10 min) for natural variation
+- **Missed sign detection** — Detects if your PC was asleep and notifies you
+- **Holiday & weekend skip** — Uses Woffu's own calendar API
+- **Duplicate prevention** — Checks clock state before signing
+- **Auto-retry** — Up to 3 retries with 3s delay on failure
 
-### Solicitudes (Requests)
-- **All 41 request types** — Vacaciones, Teletrabajo, Asistencia médica, Matrimonio, and more — loaded dynamically from Woffu's API.
-- **Searchable dropdown** — Filter request types by name with rich info: mode icon (📅 days / ⏰ hours), available stats, and document-required badge.
-- **Interactive calendar** — Monthly calendar picker with color-coded days: selected (blue), holidays (pink), pending requests (gold), accepted (green), other request types (purple), weekends (gray).
-- **Quick range mode** — Select weekdays + date range → generate dates → batch submit. Results appear as chips in real time.
-- **Hours mode** — Pick a date + start/end time → single submit.
-- **Holiday detection** — Fetches your company's calendar (national + regional + local holidays) and blocks those dates automatically. Cached for fast access.
-- **Existing request awareness** — Shows pending and accepted requests in the calendar. Pending requests (gold) can be withdrawn with a click; accepted requests (green) are locked.
-- **Stats display** — Shows available, allocated, and used days/hours per request type (e.g. "23d disponibles · 0d usados" for Vacaciones).
-- **Duplicate detection** — If a date is already requested, it's marked as "Ya solicitado" (yellow chip) instead of failing.
-- **Batch withdraw** — Retire pending requests for generated dates in one click, or click individual pending days in the calendar to withdraw them.
-- **Legend** — Color legend in the calendar explaining each day state.
+### :clipboard: Solicitudes (Requests)
+- **All 41 request types** — Vacaciones, Teletrabajo, Asistencia medica, Matrimonio, and more
+- **Searchable dropdown** — Filter by name with stats, mode icons, and doc-required badges
+- **Interactive calendar** — Monthly picker with color-coded days:
 
-### UI & Session
-- **Session-aware UI** — The popup only shows controls when Woffu's session is active. If expired, it collapses to a minimal view with a link to open Woffu.
-- **Google SSO support** — Token extraction with retry mechanism for Google login flows.
-- **Reactive session state** — Popup updates automatically when the background captures a new token.
-- **Notifications** — Get notified on failures, and optionally on successful signs too.
-- **Log & export** — View the last 50 sign events with status, and export to CSV via clipboard.
-- **Preset schedule** — One-click to load a standard full-day schedule (8:00–13:45, 14:30–17:30).
+  | Color | Meaning |
+  |-------|---------|
+  | :blue_square: Blue | Selected |
+  | :pink_square: Pink | Holiday (national / regional / local) |
+  | :yellow_square: Gold | Pending request (click to withdraw) |
+  | :green_square: Green | Accepted request (locked) |
+  | :purple_square: Purple | Other request type |
+  | :white_large_square: Gray | Weekend |
+
+- **Quick range mode** — Weekdays + date range, generate, batch submit
+- **Hours mode** — Date + start/end time for hourly requests
+- **Holiday detection** — Company calendar with national + regional + local holidays, cached
+- **Stats display** — Available, allocated, and used days/hours per type
+- **Duplicate detection** — Already requested? Shown as yellow chip, not an error
+- **Batch withdraw** — Retire pending requests in bulk or individually from the calendar
+
+### :art: UI & Session
+- **Session-aware** — Collapses when session expires, expands when active
+- **Google SSO support** — Token extraction with retry for Google login flows
+- **Reactive updates** — Popup refreshes when background captures a new token
+- **Notifications** — Failure alerts + optional success notifications
+- **Log & CSV export** — Last 50 sign events, one-click CSV to clipboard
+- **Preset schedule** — Load a standard 8:00–17:30 workday in one click
 
 ## Installation
 
-1. Clone or download this repository.
-2. Open `chrome://extensions` in Chrome.
-3. Enable **Developer mode** (top-right toggle).
-4. Click **Load unpacked** and select the `extension/` folder.
-5. Pin the Woffuk icon in the toolbar for quick access.
+```bash
+git clone https://github.com/ngavilan-dogfy/woffuk.git
+```
+
+1. Open `chrome://extensions`
+2. Enable **Developer mode** (top-right)
+3. Click **Load unpacked** → select the `extension/` folder
+4. Pin the Woffuk icon in the toolbar
 
 ## Setup
 
-1. Open [Woffu](https://dogfydiet.woffu.com) in a tab and log in.
-2. Click the Woffuk extension icon.
-3. Toggle **ON**.
-4. Configure your schedule (or click **Preset** for a standard workday).
-5. Select active days and click **Guardar**.
+1. Open your [Woffu portal](https://www.woffu.com) and log in
+2. Click the Woffuk extension icon
+3. Toggle **ON**
+4. Configure your schedule (or click **Preset**)
+5. Select active days → **Guardar**
 
-The extension reads your Woffu authentication token directly from the open Woffu tab — no credentials are stored by Woffuk.
+> The extension reads your auth token from the open Woffu tab's `sessionStorage`. No credentials are stored.
 
 ## How it works
 
-- A background alarm checks every minute if a scheduled sign event is due.
-- When it's time, Woffuk reads the auth token from your Woffu tab's `sessionStorage` and POSTs to the Woffu sign API.
-- The `triggered` map tracks which events have fired today, scoped to the local date.
-- On browser startup, the triggered map resets for the new day.
+```
+Every minute:
+  alarm fires → is there a scheduled sign? → get token from tab → POST to Woffu API
+                                           → track in triggered map (scoped to date)
+                                           → retry up to 3x on failure
+```
 
 ## Configuration
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| **Schedule** | List of clock-in/out times | 08:00 in, 13:45 out, 14:30 in, 17:30 out |
-| **Per-day overrides** | Custom schedule for specific weekdays | None |
-| **Active days** | Days of the week to run | Mon–Fri |
-| **Time window** | Minutes after scheduled time to still attempt signing | 15 min |
-| **Random offset** | Max random delay added to each sign | 3 min |
-| **Woffu URL** | Your company's Woffu subdomain | `https://dogfydiet.woffu.com` |
-| **Notify on success** | Show notification on successful signs | Off |
+| **Schedule** | Clock-in/out times | `08:00 in, 13:45 out, 14:30 in, 17:30 out` |
+| **Per-day overrides** | Custom schedule per weekday | None |
+| **Active days** | Days to run | Mon–Fri |
+| **Time window** | Minutes after scheduled time to still sign | 15 min |
+| **Random offset** | Max random delay per sign | 3 min |
+| **Woffu URL** | Your company's subdomain | `https://your-company.woffu.com` |
+| **Notify on success** | Show notification on OK signs | Off |
 
-## Requirements
+## Tech stack
 
-- Google Chrome (Manifest V3)
-- An active Woffu tab must be open and logged in for signing to work
-
-## Tech
-
-- Manifest V3 Chrome Extension
-- Zero dependencies — vanilla JS, HTML, CSS
-- Background service worker with `chrome.alarms`
-- `chrome.scripting.executeScript` with `world: "MAIN"` for token access
+| | |
+|---|---|
+| **Platform** | Chrome Extension (Manifest V3) |
+| **Language** | Vanilla JS / HTML / CSS |
+| **Dependencies** | Zero. None. Nada. |
+| **Background** | Service worker with `chrome.alarms` |
+| **Token access** | `chrome.scripting.executeScript` with `world: "MAIN"` |
+| **Vibe-coded** | 100% built with [Claude Code](https://claude.ai/claude-code) |
 
 ## License
 
 Private — internal use only.
+
+---
+
+<div align="center">
+<sub>Built with vibes, not deadlines.</sub>
+</div>
