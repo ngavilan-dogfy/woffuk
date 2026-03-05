@@ -143,14 +143,132 @@
       width: 6px; height: 6px;
       border-radius: 50%;
       background: rgba(0,0,0,0.2);
+      flex-shrink: 0;
     }
 
     .session-dot.ok { background: var(--green); }
     .session-dot.expired { background: var(--red); }
 
-    .hdr-session .session-text { color: rgba(60,30,10,0.55); }
+    .hdr-session .session-text { color: rgba(60,30,10,0.55); flex: 1; }
     .hdr-session .session-text a { color: var(--primary); text-decoration: none; font-weight: 700; }
     .hdr-session .session-text a:hover { text-decoration: underline; }
+
+    .btn-logout {
+      background: none;
+      border: none;
+      font-size: 9.5px;
+      font-weight: 700;
+      color: rgba(60,30,10,0.35);
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-logout:hover { color: var(--red); background: rgba(239,68,68,0.1); }
+
+    /* Auth panel */
+    .auth-panel {
+      margin-top: 10px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.3);
+      backdrop-filter: blur(8px);
+      padding: 12px;
+      display: none;
+    }
+
+    .auth-panel.show { display: block; }
+
+    .auth-btns {
+      display: flex;
+      gap: 6px;
+    }
+
+    .auth-btn {
+      flex: 1;
+      padding: 8px 6px;
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      background: rgba(255,255,255,0.5);
+      color: var(--dark);
+      transition: all 0.15s;
+      text-align: center;
+    }
+
+    .auth-btn:hover { background: rgba(255,255,255,0.8); }
+    .auth-btn:active { transform: scale(0.97); }
+    .auth-btn.google { border-color: rgba(66,133,244,0.3); }
+    .auth-btn.google:hover { border-color: rgba(66,133,244,0.6); }
+
+    .auth-form {
+      display: none;
+      margin-top: 8px;
+    }
+
+    .auth-form.show { display: block; }
+
+    .auth-input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      background: rgba(255,255,255,0.6);
+      color: var(--dark);
+      outline: none;
+      margin-bottom: 6px;
+      transition: border-color 0.2s;
+    }
+
+    .auth-input:focus {
+      border-color: var(--primary);
+      background: rgba(255,255,255,0.85);
+    }
+
+    .auth-input::placeholder { color: rgba(60,30,10,0.3); }
+
+    .auth-submit {
+      width: 100%;
+      padding: 8px;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--primary);
+      color: #fff;
+      transition: all 0.15s;
+    }
+
+    .auth-submit:hover { box-shadow: 0 2px 8px rgba(0,96,255,0.3); }
+    .auth-submit:active { transform: scale(0.97); }
+    .auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .auth-error {
+      font-size: 10.5px;
+      color: var(--red);
+      margin-top: 6px;
+      display: none;
+    }
+
+    .auth-error.show { display: block; }
+
+    .auth-back {
+      background: none;
+      border: none;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: rgba(60,30,10,0.4);
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 8px;
+    }
+
+    .auth-back:hover { color: rgba(60,30,10,0.7); }
 
     /* Next clock indicator */
     .hdr-next {
@@ -192,6 +310,7 @@
       color: rgba(60,30,10,0.4);
       transition: all 0.2s;
       letter-spacing: 0.2px;
+      position: relative;
     }
 
     .hdr-days .dy label:hover { background: rgba(255,255,255,0.5); }
@@ -201,6 +320,26 @@
       color: var(--dark);
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
+
+    /* Selected day for editing */
+    .hdr-days .dy.selected label {
+      outline: 2px solid var(--primary);
+      outline-offset: -2px;
+    }
+
+    /* Override dot */
+    .override-dot {
+      display: none;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--primary);
+      position: absolute;
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .hdr-days .dy.has-override .override-dot { display: block; }
 
     /* ══════════ MAIN BODY ══════════ */
     .body { padding: 0 16px 8px; margin-top: -10px; position: relative; z-index: 1; }
@@ -261,6 +400,16 @@
     .sched-btn:active { transform: scale(0.95); }
     .sched-btn.preset { color: var(--gold); }
     .sched-btn.preset:hover { background: var(--gold-soft); }
+    .sched-btn.reset { color: var(--red); font-size: 10px; }
+    .sched-btn.reset:hover { background: var(--red-soft); }
+
+    .sched-day-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
 
     .sched-list { padding: 10px 0 6px; }
 
@@ -457,7 +606,7 @@
     }
 
     .collapse-body.open {
-      max-height: 600px;
+      max-height: 1200px;
     }
 
     /* ══════════ SETTINGS BODY ══════════ */
@@ -572,73 +721,6 @@
 
     .mini-switch input:checked ~ .ms-knob { transform: translateX(16px); }
 
-    /* Holidays section */
-    .holidays-section {
-      border-top: 1px solid var(--border);
-      margin-top: 10px;
-      padding-top: 10px;
-    }
-
-    .holidays-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-    }
-
-    .holidays-head label {
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .holiday-add {
-      background: none;
-      border: none;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--primary);
-      cursor: pointer;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-
-    .holiday-add:hover { background: var(--primary-soft); }
-
-    .holiday-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .holiday-chip {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-2);
-      background: var(--bg);
-      padding: 4px 8px;
-      border-radius: 6px;
-    }
-
-    .holiday-chip button {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-3);
-      font-size: 12px;
-      line-height: 1;
-      padding: 0;
-    }
-
-    .holiday-chip button:hover { color: var(--red); }
-
-    .holiday-empty {
-      font-size: 11px;
-      color: var(--text-3);
-    }
-
     /* Test buttons */
     .test-row {
       display: grid;
@@ -749,6 +831,236 @@
 
     .lg-badge.ok { background: var(--green-soft); color: #059669; }
     .lg-badge.fail { background: var(--red-soft); color: #DC2626; }
+
+    /* ══════════ SOLICITUDES ══════════ */
+    .req-days {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    .req-days label {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 28px;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--bg);
+      color: var(--text-3);
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .req-days label:hover { background: var(--primary-soft); }
+
+    .req-days input { display: none; }
+
+    .req-days label.checked {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0,96,255,0.2);
+    }
+
+    .req-inner { padding: 0 18px 16px; }
+
+    .req-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 8px;
+      min-height: 20px;
+    }
+
+    .req-chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .req-total {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-2);
+      margin-top: 8px;
+    }
+
+    .req-results {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .req-result {
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    .req-result.ok { background: var(--green-soft); color: #059669; }
+    .req-result.fail { background: var(--red-soft); color: #DC2626; }
+    .req-result.skip { background: var(--gold-soft); color: #92710C; }
+
+    /* Searchable type selector */
+    .req-search-wrap {
+      position: relative;
+      margin-bottom: 10px;
+    }
+
+    .req-search-input {
+      width: 100%;
+      padding: 9px 32px 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--dark);
+      background: var(--bg);
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .req-search-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(0,96,255,0.08);
+      background: #fff;
+      cursor: text;
+    }
+
+    .req-search-input::placeholder { color: var(--text-3); font-weight: 500; }
+    .req-search-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .req-search-chevron {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-3);
+      font-size: 10px;
+      pointer-events: none;
+      transition: transform 0.2s;
+    }
+
+    .req-search-wrap.open .req-search-chevron {
+      transform: translateY(-50%) rotate(180deg);
+    }
+
+    .req-dropdown {
+      position: fixed;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      max-height: 260px;
+      overflow-y: auto;
+      z-index: 200;
+      display: none;
+      padding: 4px;
+    }
+
+    .req-search-wrap.open .req-dropdown { display: block; }
+
+    .req-dropdown::-webkit-scrollbar { width: 4px; }
+    .req-dropdown::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .req-opt {
+      padding: 7px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .req-opt:hover, .req-opt.hl { background: var(--primary-soft); }
+
+    .req-opt.active {
+      background: var(--primary-soft);
+      border-left: 2px solid var(--primary);
+    }
+
+    .req-opt + .req-opt { margin-top: 1px; }
+
+    .req-opt-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--dark);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .req-opt-name mark {
+      background: var(--gold-soft);
+      color: inherit;
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+
+    .req-opt-meta {
+      font-size: 10px;
+      color: var(--text-3);
+      margin-top: 1px;
+    }
+
+    .req-opt-empty {
+      padding: 16px;
+      text-align: center;
+      color: var(--text-3);
+      font-size: 12px;
+    }
+
+    .req-stats {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-2);
+      background: var(--primary-soft);
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+
+    .req-stats strong { color: var(--primary); }
+
+    .req-warn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #92600A;
+      background: var(--gold-soft);
+      padding: 5px 10px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+
+    .req-desc {
+      font-size: 11px;
+      color: var(--text-2);
+      line-height: 1.5;
+      padding: 5px 10px;
+      background: var(--bg);
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+
+    .req-hours-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
 
     /* ══════════ FOOTER ══════════ */
     .foot {
@@ -895,19 +1207,34 @@
         <div class="hdr-session" id="sessionBar">
           <div class="session-dot" id="sessionDot"></div>
           <span class="session-text" id="sessionText">Comprobando sesion...</span>
+          <button class="btn-logout" id="logoutBtn" style="display:none">Cerrar sesion</button>
+        </div>
+
+        <div class="auth-panel" id="authPanel">
+          <div class="auth-btns" id="authBtns">
+            <button class="auth-btn google" id="authGoogle">Iniciar con Google</button>
+            <button class="auth-btn" id="authCredBtn">Email y contrasena</button>
+          </div>
+          <div class="auth-form" id="authForm">
+            <button class="auth-back" id="authBack">&larr; Volver</button>
+            <input class="auth-input" type="email" id="authEmail" placeholder="tu@empresa.com" autocomplete="email">
+            <input class="auth-input" type="password" id="authPass" placeholder="Contrasena" autocomplete="current-password">
+            <button class="auth-submit" id="authSubmit">Iniciar sesion</button>
+            <div class="auth-error" id="authError"></div>
+          </div>
         </div>
         <div class="hdr-next" id="nextClock" style="display:none">
           <span id="nextClockText"></span>
         </div>
 
         <div class="hdr-days" id="days">
-          <div class="dy"><input type="checkbox" id="d1" value="1"><label for="d1">L</label></div>
-          <div class="dy"><input type="checkbox" id="d2" value="2"><label for="d2">M</label></div>
-          <div class="dy"><input type="checkbox" id="d3" value="3"><label for="d3">X</label></div>
-          <div class="dy"><input type="checkbox" id="d4" value="4"><label for="d4">J</label></div>
-          <div class="dy"><input type="checkbox" id="d5" value="5"><label for="d5">V</label></div>
-          <div class="dy"><input type="checkbox" id="d6" value="6"><label for="d6">S</label></div>
-          <div class="dy"><input type="checkbox" id="d0" value="0"><label for="d0">D</label></div>
+          <div class="dy" data-day="1"><input type="checkbox" id="d1" value="1"><label for="d1">L<span class="override-dot"></span></label></div>
+          <div class="dy" data-day="2"><input type="checkbox" id="d2" value="2"><label for="d2">M<span class="override-dot"></span></label></div>
+          <div class="dy" data-day="3"><input type="checkbox" id="d3" value="3"><label for="d3">X<span class="override-dot"></span></label></div>
+          <div class="dy" data-day="4"><input type="checkbox" id="d4" value="4"><label for="d4">J<span class="override-dot"></span></label></div>
+          <div class="dy" data-day="5"><input type="checkbox" id="d5" value="5"><label for="d5">V<span class="override-dot"></span></label></div>
+          <div class="dy" data-day="6"><input type="checkbox" id="d6" value="6"><label for="d6">S<span class="override-dot"></span></label></div>
+          <div class="dy" data-day="0"><input type="checkbox" id="d0" value="0"><label for="d0">D<span class="override-dot"></span></label></div>
         </div>
       </div>
     </div>
@@ -922,9 +1249,11 @@
       <div class="sched-head">
         <div style="display:flex;align-items:center;gap:8px">
           <span class="sched-title">Horario</span>
+          <span class="sched-day-label" id="schedDayLabel"></span>
           <span class="sched-hours" id="workedHours">0h 00m</span>
         </div>
         <div class="sched-actions">
+          <button class="sched-btn reset" id="resetToDefault" style="display:none">Restablecer</button>
           <button class="sched-btn preset" id="presetBtn" title="Jornada completa">&#9733; Preset</button>
           <button class="sched-btn" id="addRow">+ Agregar</button>
         </div>
@@ -980,17 +1309,6 @@
             </label>
           </div>
 
-          <!-- Holidays -->
-          <div class="holidays-section">
-            <div class="holidays-head">
-              <label>Dias festivos</label>
-              <button class="holiday-add" id="addHoliday">+ Agregar</button>
-            </div>
-            <div class="holiday-list" id="holidayList">
-              <span class="holiday-empty">Sin festivos</span>
-            </div>
-          </div>
-
           <!-- Test -->
           <div class="test-row">
             <button class="btn-test t-in" id="testIn">Test Entrar</button>
@@ -1018,9 +1336,98 @@
         <div class="log-list" id="log"></div>
       </div>
     </div>
+    <!-- Solicitudes -->
+    <div class="collapse-card">
+      <div class="collapse-hdr" id="reqToggle">
+        <div class="collapse-hdr-left">
+          <div class="collapse-icon">&#128221;</div>
+          <span class="collapse-label">Solicitudes</span>
+        </div>
+        <span class="collapse-chevron">&#9660;</span>
+      </div>
+      <div class="collapse-body" id="reqBody">
+        <div class="req-inner">
+          <!-- Tipo -->
+          <div class="s-field" style="margin-bottom:10px">
+            <label>Tipo</label>
+            <div class="req-search-wrap" id="reqSearchWrap">
+              <input class="req-search-input" id="reqSearchInput" type="text" placeholder="Buscar tipo de solicitud..." autocomplete="off" disabled>
+              <span class="req-search-chevron">&#9660;</span>
+              <div class="req-dropdown" id="reqDropdown"></div>
+            </div>
+          </div>
+
+          <!-- Info zone: stats + description + doc warning -->
+          <div id="reqInfo" style="display:none">
+            <div class="req-stats" id="reqStats" style="display:none"></div>
+            <div class="req-desc" id="reqDesc" style="display:none"></div>
+            <div class="req-warn" id="reqWarn" style="display:none">&#9888; Requiere documentacion</div>
+          </div>
+
+          <!-- Mode: Days -->
+          <div id="reqModeDays" style="display:none">
+            <div class="s-field" style="margin-bottom:10px">
+              <label>Dias de la semana</label>
+              <div class="req-days" id="reqDays">
+                <label data-day="1"><input type="checkbox" value="1"><span>L</span></label>
+                <label data-day="2"><input type="checkbox" value="2"><span>M</span></label>
+                <label data-day="3"><input type="checkbox" value="3"><span>X</span></label>
+                <label data-day="4"><input type="checkbox" value="4"><span>J</span></label>
+                <label data-day="5"><input type="checkbox" value="5"><span>V</span></label>
+              </div>
+            </div>
+
+            <div class="s-row">
+              <div class="s-field">
+                <label for="reqFrom">Desde</label>
+                <input class="s-input" type="date" id="reqFrom">
+              </div>
+              <div class="s-field">
+                <label for="reqTo">Hasta</label>
+                <input class="s-input" type="date" id="reqTo">
+              </div>
+            </div>
+
+            <button class="log-action-btn" id="reqGenerate" style="margin-bottom:10px">Generar fechas</button>
+
+            <div id="reqPreviewWrap" style="display:none">
+              <div class="req-preview" id="reqPreview"></div>
+              <div class="req-total" id="reqTotal"></div>
+              <div style="display:flex;gap:8px;margin-top:10px">
+                <button class="btn btn-primary" id="reqSubmitBatch" style="flex:1">Enviar solicitudes</button>
+                <button class="btn" id="reqWithdrawBatch" style="flex:0 0 auto;color:var(--red);border:1px solid var(--red);background:var(--red-soft)">Retirar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mode: Hours -->
+          <div id="reqModeHours" style="display:none">
+            <div class="req-hours-row">
+              <div class="s-field">
+                <label for="reqHoursDate">Fecha</label>
+                <input class="s-input" type="date" id="reqHoursDate">
+              </div>
+              <div class="s-field">
+                <label for="reqHoursStart">Inicio</label>
+                <input class="s-input" type="time" id="reqHoursStart" value="09:00">
+              </div>
+              <div class="s-field">
+                <label for="reqHoursEnd">Fin</label>
+                <input class="s-input" type="time" id="reqHoursEnd" value="10:00">
+              </div>
+            </div>
+            <button class="btn btn-primary" id="reqSubmitSingle">Enviar solicitud</button>
+          </div>
+
+          <!-- Results -->
+          <div class="req-results" id="reqResults"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <div class="foot">Woffuk v3.0</div>
+  <div class="foot">Woffuk v6.0</div>
 
   <script src="popup.js"></script>
 </body>
