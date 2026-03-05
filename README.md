@@ -39,12 +39,12 @@ A Chrome extension for teams using [Woffu](https://www.woffu.com) for time track
 
   | Color | Meaning |
   |-------|---------|
-  | :blue_square: Blue | Selected |
-  | :pink_square: Pink | Holiday (national / regional / local) |
-  | :yellow_square: Gold | Pending request (click to withdraw) |
-  | :green_square: Green | Accepted request (locked) |
-  | :purple_square: Purple | Other request type |
-  | :white_large_square: Gray | Weekend |
+  | 🟦 Blue | Selected |
+  | 🩷 Pink | Holiday (national / regional / local) |
+  | 🟨 Gold | Pending request (click to withdraw) |
+  | 🟩 Green | Accepted request (locked) |
+  | 🟪 Purple | Other request type |
+  | ⬜ Gray | Weekend |
 
 - **Quick range mode** — Weekdays + date range, generate, batch submit
 - **Hours mode** — Date + start/end time for hourly requests
