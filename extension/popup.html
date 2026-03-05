@@ -882,6 +882,189 @@
       border-radius: 6px;
       background: var(--primary-soft);
       color: var(--primary);
+      cursor: pointer;
+      user-select: none;
+      transition: opacity 0.15s;
+    }
+    .req-chip:hover { opacity: 0.6; }
+    .req-chip.holiday {
+      background: var(--red-soft);
+      color: var(--text-3);
+      font-weight: 400;
+      cursor: help;
+      pointer-events: none;
+    }
+    .req-chip.existing {
+      background: var(--gold-soft);
+      color: var(--text-3);
+      font-weight: 400;
+      cursor: help;
+      pointer-events: none;
+    }
+
+    /* ── Calendar picker ── */
+    .req-cal { margin: 10px 0; }
+    .req-cal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .req-cal-head span {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      text-transform: capitalize;
+    }
+    .req-cal-nav {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-2);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+    .req-cal-nav:hover { background: var(--primary-soft); color: var(--primary); }
+    .req-cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+      text-align: center;
+    }
+    .req-cal-dow {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text-3);
+      text-transform: uppercase;
+      padding: 2px 0;
+    }
+    .req-cal-day {
+      font-size: 11px;
+      padding: 5px 0;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.1s;
+      color: var(--text);
+      position: relative;
+    }
+    .req-cal-day:hover { background: var(--primary-soft); }
+    .req-cal-day.empty { pointer-events: none; }
+    .req-cal-day.selected {
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 2px 6px rgba(0,96,255,0.18);
+    }
+    .req-cal-day.holiday {
+      color: var(--red);
+      pointer-events: none;
+      background: rgba(244,63,94,0.12);
+      box-shadow: inset 0 0 0 1.5px rgba(244,63,94,0.45);
+      border-radius: 6px;
+    }
+    .req-cal-day.same-type.accepted {
+      color: #22c55e;
+      opacity: 0.6;
+      pointer-events: none;
+    }
+    .req-cal-day.same-type.accepted::after {
+      content: "✓";
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 7px;
+      line-height: 1;
+    }
+    .req-cal-day.same-type.pending {
+      color: var(--gold);
+      opacity: 0.8;
+      cursor: pointer;
+    }
+    .req-cal-day.same-type.pending::after {
+      content: "";
+      position: absolute;
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--gold);
+    }
+    .req-cal-day.same-type.pending:hover {
+      opacity: 1;
+      background: rgba(234,179,8,0.15);
+    }
+    .req-cal-day.has-request {
+      color: #A855F7;
+    }
+    .req-cal-day.has-request::after {
+      content: "";
+      position: absolute;
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #A855F7;
+    }
+    .req-cal-day.weekend {
+      color: var(--text-3);
+      pointer-events: none;
+    }
+    .req-cal-day.today {
+      box-shadow: inset 0 0 0 1.5px var(--primary);
+    }
+
+    .req-cal-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .req-cal-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9.5px;
+      color: var(--text-2);
+    }
+    .req-cal-legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .req-mode-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .req-mode-tab {
+      flex: 1;
+      padding: 6px 0;
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+      background: var(--card);
+      color: var(--text-2);
+      border: none;
+      transition: all 0.15s;
+    }
+    .req-mode-tab.active {
+      background: var(--primary);
+      color: #fff;
     }
 
     .req-total {
@@ -1366,36 +1549,64 @@
 
           <!-- Mode: Days -->
           <div id="reqModeDays" style="display:none">
-            <div class="s-field" style="margin-bottom:10px">
-              <label>Dias de la semana</label>
-              <div class="req-days" id="reqDays">
-                <label data-day="1"><input type="checkbox" value="1"><span>L</span></label>
-                <label data-day="2"><input type="checkbox" value="2"><span>M</span></label>
-                <label data-day="3"><input type="checkbox" value="3"><span>X</span></label>
-                <label data-day="4"><input type="checkbox" value="4"><span>J</span></label>
-                <label data-day="5"><input type="checkbox" value="5"><span>V</span></label>
+            <!-- Tabs: Calendar / Quick range -->
+            <div class="req-mode-tabs">
+              <button class="req-mode-tab active" id="reqTabCal">Calendario</button>
+              <button class="req-mode-tab" id="reqTabRange">Rango rapido</button>
+            </div>
+
+            <!-- Tab: Calendar picker -->
+            <div id="reqCalPanel">
+              <div class="req-cal">
+                <div class="req-cal-head">
+                  <button class="req-cal-nav" id="reqCalPrev">&#9664;</button>
+                  <span id="reqCalTitle"></span>
+                  <button class="req-cal-nav" id="reqCalNext">&#9654;</button>
+                </div>
+                <div class="req-cal-grid" id="reqCalGrid"></div>
+                <div class="req-cal-legend">
+                  <div class="req-cal-legend-item"><span class="req-cal-legend-dot" style="background:var(--primary)"></span>Seleccionado</div>
+                  <div class="req-cal-legend-item"><span class="req-cal-legend-dot" style="background:rgba(244,63,94,0.12);box-shadow:inset 0 0 0 1.5px rgba(244,63,94,0.45)"></span>Festivo</div>
+                  <div class="req-cal-legend-item"><span class="req-cal-legend-dot" style="background:#A855F7"></span>Otra solicitud</div>
+                  <div class="req-cal-legend-item"><span class="req-cal-legend-dot" style="background:var(--gold)"></span>Pendiente (clic=retirar)</div>
+                  <div class="req-cal-legend-item"><span class="req-cal-legend-dot" style="background:#22c55e"></span>Aceptada</div>
+                  <div class="req-cal-legend-item"><span class="req-cal-legend-dot" style="background:var(--text-3)"></span>Fin de semana</div>
+                </div>
               </div>
             </div>
 
-            <div class="s-row">
-              <div class="s-field">
-                <label for="reqFrom">Desde</label>
-                <input class="s-input" type="date" id="reqFrom">
+            <!-- Tab: Quick range generator -->
+            <div id="reqRangePanel" style="display:none">
+              <div class="s-field" style="margin-bottom:10px">
+                <label>Dias de la semana</label>
+                <div class="req-days" id="reqDays">
+                  <label data-day="1"><input type="checkbox" value="1"><span>L</span></label>
+                  <label data-day="2"><input type="checkbox" value="2"><span>M</span></label>
+                  <label data-day="3"><input type="checkbox" value="3"><span>X</span></label>
+                  <label data-day="4"><input type="checkbox" value="4"><span>J</span></label>
+                  <label data-day="5"><input type="checkbox" value="5"><span>V</span></label>
+                </div>
               </div>
-              <div class="s-field">
-                <label for="reqTo">Hasta</label>
-                <input class="s-input" type="date" id="reqTo">
+              <div class="s-row">
+                <div class="s-field">
+                  <label for="reqFrom">Desde</label>
+                  <input class="s-input" type="date" id="reqFrom">
+                </div>
+                <div class="s-field">
+                  <label for="reqTo">Hasta</label>
+                  <input class="s-input" type="date" id="reqTo">
+                </div>
               </div>
+              <button class="log-action-btn" id="reqGenerate" style="margin-bottom:10px">Generar fechas</button>
             </div>
 
-            <button class="log-action-btn" id="reqGenerate" style="margin-bottom:10px">Generar fechas</button>
-
+            <!-- Selected dates preview + actions (shared by both tabs) -->
             <div id="reqPreviewWrap" style="display:none">
               <div class="req-preview" id="reqPreview"></div>
               <div class="req-total" id="reqTotal"></div>
               <div style="display:flex;gap:8px;margin-top:10px">
                 <button class="btn btn-primary" id="reqSubmitBatch" style="flex:1">Enviar solicitudes</button>
-                <button class="btn" id="reqWithdrawBatch" style="flex:0 0 auto;color:var(--red);border:1px solid var(--red);background:var(--red-soft)">Retirar</button>
+                <button class="log-action-btn" id="reqWithdrawBatch" style="color:var(--red)">Retirar seleccion</button>
               </div>
             </div>
           </div>

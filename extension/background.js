@@ -666,6 +666,91 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Fetch holidays for the user's calendar
+  if (msg.action === "fetchHolidays") {
+    (async () => {
+      try {
+        // Return from cache if available
+        const { cachedHolidays } = await chrome.storage.local.get("cachedHolidays");
+        if (cachedHolidays && cachedHolidays.length > 0) {
+          sendResponse({ ok: true, holidays: cachedHolidays });
+          return;
+        }
+
+        const baseUrl = await getBaseUrl();
+        const token = await getToken();
+        if (!token) { sendResponse({ ok: false, error: "Sin sesion" }); return; }
+
+        // Get CalendarId — try cached first, then extract from Woffu tab
+        let { cachedCalendarId } = await chrome.storage.local.get("cachedCalendarId");
+        if (!cachedCalendarId) {
+          // Extract CalendarId from the Woffu tab's sessionStorage user object
+          const tabs = await chrome.tabs.query({ url: "https://*.woffu.com/*" });
+          for (const tab of tabs) {
+            try {
+              if (tab.status !== "complete") continue;
+              const results = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                world: "MAIN",
+                func: () => {
+                  try {
+                    const u = JSON.parse(sessionStorage.getItem("user"));
+                    return u?.userId || null;
+                  } catch { return null; }
+                }
+              });
+              const userId = results?.[0]?.result;
+              if (!userId) continue;
+              // Use tab's own token to call /api/users/{id}
+              const tabResults = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                world: "MAIN",
+                func: async (uid) => {
+                  try {
+                    const t = sessionStorage.getItem("token");
+                    const r = await fetch(`/api/users/${uid}`, {
+                      headers: { "Authorization": "Bearer " + t, "Accept": "application/json" }
+                    });
+                    if (!r.ok) return null;
+                    const u = await r.json();
+                    return u.CalendarId || null;
+                  } catch { return null; }
+                },
+                args: [userId]
+              });
+              cachedCalendarId = tabResults?.[0]?.result;
+              if (cachedCalendarId) {
+                await chrome.storage.local.set({ cachedCalendarId });
+                break;
+              }
+            } catch (e) {
+              console.log("[Woffuk] Tab CalendarId extract failed:", e.message);
+            }
+          }
+        }
+
+        if (!cachedCalendarId) { sendResponse({ ok: false, error: "No CalendarId found" }); return; }
+
+        // Fetch calendar events
+        const evR = await fetch(`${baseUrl}/api/calendars/${cachedCalendarId}/events`, {
+          headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" }
+        });
+        if (!evR.ok) { sendResponse({ ok: false, error: `Calendar HTTP ${evR.status}` }); return; }
+        const events = await evR.json();
+
+        const holidays = events
+          .filter(e => e.IsHoliday)
+          .map(e => ({ name: e.Name, date: e.TrueDate.split("T")[0], cycle: e.Cycle }));
+
+        await chrome.storage.local.set({ cachedHolidays: holidays });
+        sendResponse({ ok: true, holidays });
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
   // Fetch user requests (for cancel/withdraw)
   if (msg.action === "fetchUserRequests") {
     (async () => {
@@ -682,7 +767,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         });
         if (!r.ok) { sendResponse({ ok: false, error: `HTTP ${r.status}` }); return; }
         const data = await r.json();
-        sendResponse({ ok: true, requests: data });
+        // API may return array directly or wrapped object
+        const requests = Array.isArray(data) ? data : (data.Results || data.Items || []);
+        sendResponse({ ok: true, requests });
       } catch (err) {
         sendResponse({ ok: false, error: err.message });
       }

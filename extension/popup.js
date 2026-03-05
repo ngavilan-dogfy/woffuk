@@ -732,6 +732,9 @@ let reqContextLoaded = false;
 let reqAgreementEvents = [];
 let reqGeneratedDates = [];
 let reqSelectedIdx = -1; // index into reqAgreementEvents
+let reqHolidaySet = new Set(); // "YYYY-MM-DD" strings for quick lookup
+let reqHolidayNames = {}; // "YYYY-MM-DD" → name
+let reqExistingDates = {}; // "YYYY-MM-DD" → { type, status }
 
 // Cached DOM elements
 const reqSearchWrap = document.getElementById("reqSearchWrap");
@@ -752,6 +755,12 @@ const reqSubmitSingleBtn = document.getElementById("reqSubmitSingle");
 const reqWithdrawBatchBtn = document.getElementById("reqWithdrawBatch");
 const reqFromInput = document.getElementById("reqFrom");
 const reqToInput = document.getElementById("reqTo");
+const reqCalGrid = document.getElementById("reqCalGrid");
+const reqCalTitle = document.getElementById("reqCalTitle");
+const reqCalPanel = document.getElementById("reqCalPanel");
+const reqRangePanel = document.getElementById("reqRangePanel");
+const reqTabCal = document.getElementById("reqTabCal");
+const reqTabRange = document.getElementById("reqTabRange");
 const reqHoursDateInput = document.getElementById("reqHoursDate");
 const reqHoursStartInput = document.getElementById("reqHoursStart");
 const reqHoursEndInput = document.getElementById("reqHoursEnd");
@@ -932,11 +941,32 @@ async function loadReqContext() {
   reqSearchInput.disabled = true;
   reqSearchInput.placeholder = "Cargando tipos...";
   try {
+    // Sequential calls to avoid MV3 parallel sendMessage issues
     const r = await chrome.runtime.sendMessage({ action: "fetchRequestContext" });
     if (!r?.ok) {
       reqSearchInput.placeholder = `Error: ${r?.error || "desconocido"}`;
       return;
     }
+
+    // Holidays
+    const hr = await chrome.runtime.sendMessage({ action: "fetchHolidays" });
+    if (hr?.ok && hr.holidays) {
+      buildHolidaySet(hr.holidays);
+      console.log("[Woffuk] Holidays loaded:", reqHolidaySet.size, "dates");
+    } else {
+      console.warn("[Woffuk] Holidays failed:", hr?.error || "undefined response");
+    }
+
+    // Existing requests
+    const er = await chrome.runtime.sendMessage({ action: "fetchUserRequests", page: 1, pageSize: 200 });
+    if (er?.ok && er.requests) {
+      const reqs = Array.isArray(er.requests) ? er.requests : [];
+      buildExistingDates(reqs);
+      console.log("[Woffuk] Existing requests:", reqs.length, "→", Object.keys(reqExistingDates).length, "dates");
+    } else {
+      console.warn("[Woffuk] Requests failed:", er?.error || "undefined response");
+    }
+
     const prevIdx = reqSelectedIdx;
     reqAgreementEvents = r.data.AgreementEvents || [];
     if (reqAgreementEvents.length === 0) {
@@ -945,7 +975,6 @@ async function loadReqContext() {
     }
     reqSearchInput.disabled = false;
     reqSearchInput.placeholder = "Buscar tipo de solicitud...";
-    // Restore previous selection if still valid (e.g. after stats refresh)
     if (prevIdx >= 0 && reqAgreementEvents[prevIdx]) {
       reqSelectedIdx = prevIdx;
       reqSearchInput.value = getSelectedTypeName();
@@ -953,7 +982,68 @@ async function loadReqContext() {
     updateReqTypeInfo();
   } catch (err) {
     reqSearchInput.placeholder = `Error: ${err.message}`;
+    console.error("[Woffuk] loadReqContext error:", err);
   }
+}
+
+// Build a set of holiday dates for the relevant year range
+function buildHolidaySet(holidays) {
+  reqHolidaySet = new Set();
+  reqHolidayNames = {};
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear, currentYear + 1];
+
+  for (const h of holidays) {
+    if (h.cycle === 365) {
+      // Recurring — apply MM-DD to each year
+      const mmdd = h.date.substring(5); // "MM-DD"
+      for (const y of years) {
+        const key = `${y}-${mmdd}`;
+        reqHolidaySet.add(key);
+        reqHolidayNames[key] = h.name;
+      }
+    } else {
+      // Fixed date (cycle 0) — use as-is
+      reqHolidaySet.add(h.date);
+      reqHolidayNames[h.date] = h.name;
+    }
+  }
+}
+
+// Build a map of dates that already have requests (pending or accepted)
+function buildExistingDates(requests) {
+  reqExistingDates = {};
+  for (const req of requests) {
+    if (req.RequestStatusId !== 10 && req.RequestStatusId !== 20) continue;
+    const d = req.StartDate?.split("T")[0];
+    if (!d) continue;
+    const endD = req.EndDate?.split("T")[0] || d;
+    const current = new Date(d + "T00:00:00");
+    const end = new Date(endD + "T00:00:00");
+    while (current <= end) {
+      const key = localDateKey(current);
+      if (!reqExistingDates[key]) reqExistingDates[key] = [];
+      reqExistingDates[key].push({
+        type: req.AgreementEventName || req.AgreementEventDescription || req.AgreementEventTitle || "Solicitud",
+        status: req.RequestStatusId === 10 ? "pendiente" : "aceptada",
+        eventId: req.AgreementEventId,
+        requestId: req.RequestId
+      });
+      current.setDate(current.getDate() + 1);
+    }
+  }
+}
+
+// Check if a date has an existing request for the SAME agreement event type
+function dateHasSameTypeRequest(dateKey) {
+  if (!reqExistingDates[dateKey] || reqSelectedIdx < 0) return null;
+  const currentEventId = reqAgreementEvents[reqSelectedIdx]?.AgreementEventId;
+  return reqExistingDates[dateKey].find(e => e.eventId === currentEventId) || null;
+}
+
+// Check if a date has ANY existing request
+function dateHasAnyRequest(dateKey) {
+  return reqExistingDates[dateKey]?.[0] || null;
 }
 
 function updateReqTypeInfo() {
@@ -1005,12 +1095,161 @@ function updateReqTypeInfo() {
   reqModeDays.style.display = useHours ? "none" : "block";
   reqModeHours.style.display = useHours ? "block" : "none";
 
-  // Reset preview
+  // Reset preview and calendar
   reqPreviewWrap.style.display = "none";
   reqGeneratedDates = [];
+  if (!useHours) renderCalendar();
 }
 
-// Weekday checkboxes toggle
+// ── Tabs: Calendar / Quick range ──
+reqTabCal.addEventListener("click", () => {
+  reqTabCal.classList.add("active"); reqTabRange.classList.remove("active");
+  reqCalPanel.style.display = ""; reqRangePanel.style.display = "none";
+  renderCalendar();
+});
+reqTabRange.addEventListener("click", () => {
+  reqTabRange.classList.add("active"); reqTabCal.classList.remove("active");
+  reqRangePanel.style.display = ""; reqCalPanel.style.display = "none";
+});
+
+// ── Calendar picker ──
+let reqCalMonth = new Date().getMonth();
+let reqCalYear = new Date().getFullYear();
+const MONTH_NAMES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const DOW_ES = ["L","M","X","J","V","S","D"];
+
+document.getElementById("reqCalPrev").addEventListener("click", () => {
+  reqCalMonth--; if (reqCalMonth < 0) { reqCalMonth = 11; reqCalYear--; }
+  renderCalendar();
+});
+document.getElementById("reqCalNext").addEventListener("click", () => {
+  reqCalMonth++; if (reqCalMonth > 11) { reqCalMonth = 0; reqCalYear++; }
+  renderCalendar();
+});
+
+function renderCalendar() {
+  reqCalTitle.textContent = `${MONTH_NAMES_ES[reqCalMonth]} ${reqCalYear}`;
+  reqCalGrid.innerHTML = "";
+
+  // Day-of-week headers
+  DOW_ES.forEach(d => {
+    const el = document.createElement("div");
+    el.className = "req-cal-dow";
+    el.textContent = d;
+    reqCalGrid.appendChild(el);
+  });
+
+  const firstDay = new Date(reqCalYear, reqCalMonth, 1);
+  let startDow = firstDay.getDay(); // 0=Sun
+  startDow = startDow === 0 ? 6 : startDow - 1; // Convert to Mon=0
+  const daysInMonth = new Date(reqCalYear, reqCalMonth + 1, 0).getDate();
+  const todayKey = localDateKey(new Date());
+  const currentEventId = reqSelectedIdx >= 0 ? reqAgreementEvents[reqSelectedIdx]?.AgreementEventId : null;
+
+  // Empty cells before first day
+  for (let i = 0; i < startDow; i++) {
+    const el = document.createElement("div");
+    el.className = "req-cal-day empty";
+    reqCalGrid.appendChild(el);
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(reqCalYear, reqCalMonth, day);
+    const key = localDateKey(date);
+    const dow = date.getDay();
+    const isWeekend = dow === 0 || dow === 6;
+    const isHoliday = reqHolidaySet.has(key);
+    const sameTypeReq = dateHasSameTypeRequest(key);
+    const anyReq = dateHasAnyRequest(key);
+    const isSelected = reqGeneratedDates.includes(key);
+    const isToday = key === todayKey;
+
+    const el = document.createElement("div");
+    el.className = "req-cal-day";
+    el.textContent = day;
+    if (isToday) el.classList.add("today");
+
+    if (isWeekend) {
+      el.classList.add("weekend");
+    } else if (isHoliday) {
+      el.classList.add("holiday");
+      el.title = reqHolidayNames[key] || "Festivo";
+    } else if (sameTypeReq && sameTypeReq.status === "aceptada") {
+      el.classList.add("same-type", "accepted");
+      el.title = `${sameTypeReq.type} (aceptada — no se puede retirar)`;
+    } else if (sameTypeReq && sameTypeReq.status === "pendiente") {
+      el.classList.add("same-type", "pending");
+      el.title = `${sameTypeReq.type} (pendiente — clic para retirar)`;
+      el.addEventListener("click", async () => {
+        if (!confirm(`¿Retirar ${sameTypeReq.type} del ${day}/${reqCalMonth + 1}?`)) return;
+        el.style.opacity = "0.3";
+        const cr = await chrome.runtime.sendMessage({ action: "cancelRequest", requestId: sameTypeReq.requestId });
+        if (cr?.ok) {
+          showToast("Solicitud retirada", "ok");
+          loadReqContext();
+        } else {
+          showToast(cr?.error || "Error al retirar", "err");
+          el.style.opacity = "";
+        }
+      });
+    } else {
+      if (isSelected) el.classList.add("selected");
+      // Purple dot for days with other-type requests (still selectable)
+      if (anyReq && !sameTypeReq) {
+        el.classList.add("has-request");
+        const types = reqExistingDates[key].map(e => `${e.type} (${e.status})`).join(", ");
+        el.title = types;
+      }
+      el.addEventListener("click", () => {
+        const idx = reqGeneratedDates.indexOf(key);
+        if (idx >= 0) {
+          reqGeneratedDates.splice(idx, 1);
+        } else {
+          reqGeneratedDates.push(key);
+          reqGeneratedDates.sort();
+        }
+        renderCalendar();
+        renderPreview();
+      });
+    }
+
+    reqCalGrid.appendChild(el);
+  }
+}
+
+// ── Shared preview rendering ──
+function renderPreview() {
+  reqResultsEl.innerHTML = "";
+  if (reqGeneratedDates.length === 0) {
+    reqPreviewWrap.style.display = "none";
+    return;
+  }
+
+  reqPreviewEl.innerHTML = reqGeneratedDates.map(d => {
+    const date = new Date(d + "T00:00:00");
+    const label = date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+    return `<span class="req-chip" data-date="${d}">${label}</span>`;
+  }).join("");
+
+  // Clickable chips to deselect
+  reqPreviewEl.querySelectorAll(".req-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const d = chip.dataset.date;
+      const idx = reqGeneratedDates.indexOf(d);
+      if (idx >= 0) {
+        reqGeneratedDates.splice(idx, 1);
+        renderCalendar();
+        renderPreview();
+      }
+    });
+  });
+
+  reqTotalEl.textContent = `Total: ${reqGeneratedDates.length} dias`;
+  reqSubmitBatchBtn.textContent = `Enviar ${reqGeneratedDates.length} solicitudes`;
+  reqPreviewWrap.style.display = "block";
+}
+
+// ── Weekday checkboxes toggle ──
 document.getElementById("reqDays").addEventListener("click", (e) => {
   const label = e.target.closest("label");
   if (!label) return;
@@ -1024,7 +1263,7 @@ reqFromInput.value = localDateKey(today);
 reqToInput.value = localDateKey(new Date(today.getFullYear(), today.getMonth() + 1, 0));
 reqHoursDateInput.value = localDateKey(today);
 
-// Generate dates (days mode)
+// Generate dates (range mode)
 document.getElementById("reqGenerate").addEventListener("click", () => {
   const selectedDays = [];
   document.querySelectorAll("#reqDays input:checked").forEach(cb => selectedDays.push(Number(cb.value)));
@@ -1035,30 +1274,33 @@ document.getElementById("reqGenerate").addEventListener("click", () => {
   if (isNaN(from) || isNaN(to) || from > to) { showToast("Rango de fechas invalido", "err"); return; }
 
   reqGeneratedDates = [];
+  let skippedCount = 0;
   const current = new Date(from);
+  const currentEventId = reqSelectedIdx >= 0 ? reqAgreementEvents[reqSelectedIdx]?.AgreementEventId : null;
+
   while (current <= to) {
     if (selectedDays.includes(current.getDay())) {
-      reqGeneratedDates.push(localDateKey(current));
+      const key = localDateKey(current);
+      if (reqHolidaySet.has(key)) {
+        skippedCount++;
+      } else if (dateHasSameTypeRequest(key)) {
+        skippedCount++;
+      } else {
+        reqGeneratedDates.push(key);
+      }
     }
     current.setDate(current.getDate() + 1);
   }
 
-  reqResultsEl.innerHTML = "";
-
   if (reqGeneratedDates.length === 0) {
     reqPreviewWrap.style.display = "none";
-    showToast("No hay fechas que coincidan", "err");
+    showToast(skippedCount > 0 ? "Todas excluidas (festivos/ya solicitados)" : "No hay fechas", "err");
     return;
   }
 
-  reqPreviewEl.innerHTML = reqGeneratedDates.map(d => {
-    const date = new Date(d + "T00:00:00");
-    const label = date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
-    return `<span class="req-chip">${label}</span>`;
-  }).join("");
-  reqTotalEl.textContent = `Total: ${reqGeneratedDates.length} dias`;
-  reqSubmitBatchBtn.textContent = `Enviar ${reqGeneratedDates.length} solicitudes`;
-  reqPreviewWrap.style.display = "block";
+  renderPreview();
+  renderCalendar();
+  if (skippedCount > 0) showToast(`${skippedCount} fechas excluidas (festivos/ya solicitados)`, "info");
 });
 
 // Submit batch (days mode) — loop in popup so each sendMessage resolves quickly

@@ -16,11 +16,15 @@ Chrome extension that automatically clocks in and out on [Woffu](https://www.wof
 ### Solicitudes (Requests)
 - **All 41 request types** — Vacaciones, Teletrabajo, Asistencia médica, Matrimonio, and more — loaded dynamically from Woffu's API.
 - **Searchable dropdown** — Filter request types by name with rich info: mode icon (📅 days / ⏰ hours), available stats, and document-required badge.
-- **Days mode** — Select weekdays + date range → generate dates → batch submit. Results appear as chips in real time.
+- **Interactive calendar** — Monthly calendar picker with color-coded days: selected (blue), holidays (pink), pending requests (gold), accepted (green), other request types (purple), weekends (gray).
+- **Quick range mode** — Select weekdays + date range → generate dates → batch submit. Results appear as chips in real time.
 - **Hours mode** — Pick a date + start/end time → single submit.
+- **Holiday detection** — Fetches your company's calendar (national + regional + local holidays) and blocks those dates automatically. Cached for fast access.
+- **Existing request awareness** — Shows pending and accepted requests in the calendar. Pending requests (gold) can be withdrawn with a click; accepted requests (green) are locked.
 - **Stats display** — Shows available, allocated, and used days/hours per request type (e.g. "23d disponibles · 0d usados" for Vacaciones).
 - **Duplicate detection** — If a date is already requested, it's marked as "Ya solicitado" (yellow chip) instead of failing.
-- **Batch withdraw** — Retire pending requests for generated dates in one click.
+- **Batch withdraw** — Retire pending requests for generated dates in one click, or click individual pending days in the calendar to withdraw them.
+- **Legend** — Color legend in the calendar explaining each day state.
 
 ### UI & Session
 - **Session-aware UI** — The popup only shows controls when Woffu's session is active. If expired, it collapses to a minimal view with a link to open Woffu.
