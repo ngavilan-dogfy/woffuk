@@ -335,15 +335,26 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (currentTotalMinutes < fireAtMinute) continue;
 
     const currentToken = token || await getToken();
+    let validationError = null;
     if (currentToken) {
       const signState = await getCurrentSignState(currentToken, baseUrl);
-      if (signState === entry.type) {
-        console.log(`[Woffuk] Already ${entry.type} — skipping duplicate sign`);
-        triggeredMap[entryKey] = { time: now.toISOString(), success: true, skipped: true };
+
+      if (signState === null) {
+        validationError = "No se pudo verificar el estado actual";
+      } else if (entry.type === "in" && !signState.canSignIn) {
+        validationError = "Entrada bloqueada: primero debes salir";
+      } else if (entry.type === "out" && !signState.canSignOut) {
+        validationError = "Salida bloqueada: primero debes entrar";
+      }
+
+      if (validationError) {
+        console.log(`[Woffuk] Sequence validation failed: ${validationError}`);
+        triggeredMap[entryKey] = { time: now.toISOString(), success: false, blocked: true };
         delete triggeredMap[`retry_${entryKey}`];
         await chrome.storage.local.set({ triggered: triggeredMap });
-        await appendLog(entry.type, true, `Skipped — already ${entry.type === "in" ? "clocked in" : "clocked out"}`, 0);
-        break;
+        await appendLog(entry.type, false, validationError, 0);
+        notify("Woffuk - BLOQUEADO", `${validationError}. Fichaje de las ${entry.hour}:${String(entry.minute).padStart(2, "0")} no registrado.`);
+        continue;
       }
     }
 
@@ -352,7 +363,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     const success = await triggerSignWithRetry(entry.type);
 
     if (success) {
-      // Success — mark done, clear retry marker
       triggeredMap[entryKey] = { time: now.toISOString(), success: true };
       delete triggeredMap[`retry_${entryKey}`];
       await chrome.storage.local.set({ triggered: triggeredMap });
@@ -361,11 +371,17 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         notify("Woffuk - OK", `Fichaje de las ${entry.hour}:${String(entry.minute).padStart(2, "0")} completado.`);
       }
     } else {
-      // Failure — do NOT mark entryKey done, set retry marker instead
-      // Next alarm tick (60s) will retry automatically until window expires
-      triggeredMap[`retry_${entryKey}`] = { lastAttempt: now.toISOString() };
-      await chrome.storage.local.set({ triggered: triggeredMap });
-      console.log(`[Woffuk] Sign failed, will retry on next tick (retry marker set for ${entryKey})`);
+      const lastError = triggeredMap[`retry_${entryKey}`]?.lastError;
+      if (lastError === "SEQUENCE_BLOCKED") {
+        triggeredMap[entryKey] = { time: now.toISOString(), success: false, blocked: true };
+        delete triggeredMap[`retry_${entryKey}`];
+        await chrome.storage.local.set({ triggered: triggeredMap });
+        console.log(`[Woffuk] Sequence blocked after retries for ${entryKey}`);
+      } else {
+        triggeredMap[`retry_${entryKey}`] = { lastAttempt: now.toISOString() };
+        await chrome.storage.local.set({ triggered: triggeredMap });
+        console.log(`[Woffuk] Sign failed, will retry on next tick (retry marker set for ${entryKey})`);
+      }
     }
     break;
   }
@@ -479,6 +495,8 @@ async function isWorkday(token, baseUrl) {
 }
 
 // ── Check current sign state to prevent duplicates ────
+// ── Check current sign state ───
+// Returns: { lastType: "in" | "out" | null, canSignIn: bool, canSignOut: bool } or null on error
 async function getCurrentSignState(token, baseUrl) {
   try {
     const r = await fetch(`${baseUrl}/api/signs/slots`, {
@@ -487,11 +505,18 @@ async function getCurrentSignState(token, baseUrl) {
     if (r.status !== 200) return null;
 
     const slots = await r.json();
-    if (!slots || slots.length === 0) return "out";
+    if (!slots || slots.length === 0) {
+      return { lastType: null, canSignIn: true, canSignOut: false };
+    }
 
     const lastSlot = slots[slots.length - 1];
-    if (lastSlot.In && !lastSlot.Out) return "in";
-    return "out";
+    const isIn = lastSlot.In && !lastSlot.Out;
+
+    return {
+      lastType: isIn ? "in" : "out",
+      canSignIn: !isIn,
+      canSignOut: isIn
+    };
   } catch (err) {
     console.log(`[Woffuk] getCurrentSignState error: ${err.message}`);
     return null;
@@ -509,8 +534,37 @@ chrome.storage.onChanged.addListener((changes) => {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "manualTrigger") {
     (async () => {
+      const desiredType = msg.type;
+      const token = await getToken();
+      const baseUrl = await getBaseUrl();
+
+      if (token) {
+        const signState = await getCurrentSignState(token, baseUrl);
+
+        if (signState === null) {
+          const error = "No se pudo verificar el estado actual";
+          await appendLog(desiredType, false, error, 1);
+          sendResponse({ success: false, error, blocked: true });
+          return;
+        }
+
+        if (desiredType === "in" && !signState.canSignIn) {
+          const error = "Entrada bloqueada: primero debes salir";
+          await appendLog(desiredType, false, error, 1);
+          sendResponse({ success: false, error, blocked: true });
+          return;
+        }
+
+        if (desiredType === "out" && !signState.canSignOut) {
+          const error = "Salida bloqueada: primero debes entrar";
+          await appendLog(desiredType, false, error, 1);
+          sendResponse({ success: false, error, blocked: true });
+          return;
+        }
+      }
+
       const result = await triggerSign();
-      await appendLog(msg.type || "sign", result.success, result.error, 1);
+      await appendLog(desiredType || "sign", result.success, result.error, 1);
       sendResponse(result);
     })();
     return true;

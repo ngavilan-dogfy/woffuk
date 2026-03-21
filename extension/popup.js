@@ -647,6 +647,8 @@ async function testClock(type) {
     const response = await chrome.runtime.sendMessage({ action: "manualTrigger", type });
     if (response?.success) {
       showToast(`${type === "in" ? "Entrar" : "Salir"} ejecutado correctamente`, "ok");
+    } else if (response?.blocked) {
+      showToast(response?.error || "Accion bloqueada", "err");
     } else {
       showToast(response?.error || "Error desconocido", "err");
     }
