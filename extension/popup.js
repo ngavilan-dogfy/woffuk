@@ -34,8 +34,10 @@ const resetToDefault = document.getElementById("resetToDefault");
 // ── Per-day schedule state ──────────────────────────────
 let schedulesData = null;  // { default: [...], overrides: { "5": [...], ... } }
 let selectedDay = null;    // null = default, number = editing that day's override
+let fullDayAbsences = {};  // { "2026-03-24": { type: "Vacaciones", hoursRequested: 1 }, ... }
 
 const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
+const ABSENCE_EMOJI = "🏝️";
 
 function getScheduleForDay(dayNumber) {
   if (!schedulesData) return [];
@@ -48,6 +50,67 @@ function getScheduleForDay(dayNumber) {
 
 function localDateKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// ── Full-day absences ─────────────────────────────────
+async function loadFullDayAbsences() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: "getFullDayAbsences" });
+    if (response.ok) {
+      fullDayAbsences = response.absences || {};
+      updateAbsenceUI();
+    }
+  } catch (err) {
+    console.log("[Woffuk] loadFullDayAbsences error:", err.message);
+  }
+}
+
+function updateAbsenceUI() {
+  const dayButtons = daysContainer.querySelectorAll(".dy");
+  
+  dayButtons.forEach((btn) => {
+    const dayNum = parseInt(btn.dataset.day, 10);
+    const label = btn.querySelector("label");
+    const originalLetter = btn.dataset.originalLetter || label.textContent.replace(/🏝️/g, "").trim();
+    
+    // Store original letter on first run
+    if (!btn.dataset.originalLetter) {
+      btn.dataset.originalLetter = originalLetter;
+    }
+    
+    // Remove existing absence styling
+    btn.classList.remove("is-absent");
+    btn.querySelector(".absence-dot")?.remove();
+    
+    // Check all days of the current week for absences
+    const today = new Date();
+    const currentDayOfWeek = today.getDay();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((currentDayOfWeek + 6) % 7));
+    
+    // Check each day button against the week
+    const dayIndex = [1, 2, 3, 4, 5, 6, 0].indexOf(dayNum); // Mon to Sun order
+    const checkDate = new Date(monday);
+    checkDate.setDate(monday.getDate() + dayIndex);
+    const dateKey = localDateKey(checkDate);
+    
+    if (fullDayAbsences[dateKey]) {
+      // Show absence emoji
+      label.textContent = ABSENCE_EMOJI;
+      btn.classList.add("is-absent");
+      
+      // Add absence indicator dot
+      const dot = document.createElement("span");
+      dot.className = "absence-dot";
+      btn.appendChild(dot);
+      
+      // Tooltip with absence type
+      btn.title = `Ausencia: ${fullDayAbsences[dateKey].type}`;
+    } else {
+      // Restore original letter
+      label.textContent = originalLetter;
+    }
+  });
 }
 
 // ── Collapsible sections ───────────────────────────────
@@ -481,6 +544,9 @@ async function load() {
   renderLog(data.log || []);
   updateNextClock(data.triggered, isEnabled);
   if (isEnabled) checkSession();
+  
+  // Load full-day absences for UI indicators
+  loadFullDayAbsences();
 }
 
 // ── Schedule rows ──────────────────────────────────────
@@ -647,6 +713,8 @@ async function testClock(type) {
     const response = await chrome.runtime.sendMessage({ action: "manualTrigger", type });
     if (response?.success) {
       showToast(`${type === "in" ? "Entrar" : "Salir"} ejecutado correctamente`, "ok");
+    } else if (response?.blocked) {
+      showToast(response?.error || "Accion bloqueada", "err");
     } else {
       showToast(response?.error || "Error desconocido", "err");
     }

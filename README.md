@@ -9,7 +9,7 @@
 [![Chrome MV3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/)
 [![Vanilla JS](https://img.shields.io/badge/Vanilla-JS%20%2F%20HTML%20%2F%20CSS-F7DF1E?logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![Vibe Coded](https://img.shields.io/badge/%E2%9C%A8-vibe--coded-blueviolet)](#)
-[![Version](https://img.shields.io/badge/version-1.0-blue)](#)
+[![Version](https://img.shields.io/badge/version-1.1-blue)](#)
 
 *100% vibe-coded with [Claude Code](https://claude.ai/claude-code). Zero dependencies. Pure vibes.*
 
@@ -29,6 +29,7 @@ A Chrome extension for teams using [Woffu](https://www.woffu.com) for time track
 - **Random offset** — Configurable random delay (0–10 min) for natural variation
 - **Missed sign detection** — Detects if your PC was asleep and notifies you
 - **Holiday & weekend skip** — Uses Woffu's own calendar API
+- **Full-day absence skip** — Detects accepted absences covering your full workday and skips all signing
 - **Duplicate prevention** — Checks clock state before signing
 - **Auto-retry** — Up to 3 retries with 3s delay on failure
 
@@ -52,6 +53,15 @@ A Chrome extension for teams using [Woffu](https://www.woffu.com) for time track
 - **Stats display** — Available, allocated, and used days/hours per type
 - **Duplicate detection** — Already requested? Shown as yellow chip, not an error
 - **Batch withdraw** — Retire pending requests in bulk or individually from the calendar
+
+### :palm_tree: Full-Day Absence Detection
+- **Visual indicator** — Days with accepted full-day absences show 🏝️ emoji in the day selector
+- **Automatic skip** — When today has a full-day absence, all scheduled sign events are skipped
+- **Smart detection** — Considers both day-based and hour-based requests:
+  - Day-based requests with `NumberDaysRequested > 0` are full-day
+  - Hour-based requests are full-day if absence hours ≥ 90% of workday
+- **Background sync** — Absences are fetched every hour and cached for offline use
+- **Popup refresh** — Open the popup anytime to update absence indicators
 
 ### :art: UI & Session
 - **Session-aware** — Collapses when session expires, expands when active
@@ -86,10 +96,27 @@ git clone https://github.com/ngavilan-dogfy/woffuk.git
 
 ```
 Every minute:
-  alarm fires → is there a scheduled sign? → get token from tab → POST to Woffu API
-                                           → track in triggered map (scoped to date)
-                                           → retry up to 3x on failure
+  alarm fires → is today a workday? → check absence cache → is there a scheduled sign?
+               → get token from tab → POST to Woffu API
+               → track in triggered map (scoped to date)
+               → retry up to 3x on failure
+
+Every hour:
+  alarm fires → fetch user requests from Woffu API
+             → filter accepted full-day absences
+             → cache results for offline use
+             → update popup UI indicators
 ```
+
+### Full-Day Absence Logic
+
+1. **Fetch** — Retrieves all user requests via `/api/users/{userId}/requests`
+2. **Filter** — Only accepted requests (`RequestStatusId === 20`)
+3. **Expand** — For multi-day requests, expands each date in the range
+4. **Calculate** — Compares absence hours to workday hours:
+   - Day-based (`NumberDaysRequested > 0`) → full day by default
+   - Hour-based → full day if absence ≥ 90% of configured workday
+5. **Skip** — If today matches, all signs are omitted and logged
 
 ## Configuration
 

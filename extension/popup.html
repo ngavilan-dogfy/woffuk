@@ -341,6 +341,34 @@
 
     .hdr-days .dy.has-override .override-dot { display: block; }
 
+    /* Absence dot indicator */
+    .absence-dot {
+      position: absolute;
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #10B981;
+    }
+
+    /* Absence day styling */
+    .hdr-days .dy.is-absent {
+      cursor: default;
+    }
+
+    .hdr-days .dy.is-absent label {
+      background: rgba(16, 185, 129, 0.15);
+      color: #059669;
+    }
+
+    .hdr-days .dy.is-absent input:checked + label {
+      background: rgba(16, 185, 129, 0.25);
+      color: #047857;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+    }
+
     /* ══════════ MAIN BODY ══════════ */
     .body { padding: 0 16px 8px; margin-top: -10px; position: relative; z-index: 1; }
 
