@@ -457,7 +457,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   const absence = await hasFullDayAbsence(todayStr);
   if (absence) {
     console.log(`[Woffuk] Skipping check-in: full-day absence (${absence.type}) on ${todayStr}`);
-    await appendLog("skip", true, `Dia de ausencia completa (${absence.type}) - fichaje omitido`, 0);
+    await appendLog("skip", true, `Día de ausencia completa (${absence.type}) - fichaje omitido`, 0);
     return;
   }
 
