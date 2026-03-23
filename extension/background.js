@@ -13,6 +13,7 @@ const DEFAULT_TIME_WINDOW = 15;
 const DEFAULT_RANDOM_OFFSET = 3;
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 3000;
+const ABSENCE_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 // ── Per-day schedule helper ────────────────────────────
 function getScheduleForDay(schedulesData, dayNumber) {
@@ -22,6 +23,153 @@ function getScheduleForDay(schedulesData, dayNumber) {
     return schedulesData.overrides[dayStr];
   }
   return schedulesData.default || DEFAULT_SCHEDULE;
+}
+
+// ── Calculate total work minutes for a schedule ────────
+function getScheduleTotalMinutes(schedule) {
+  if (!schedule || schedule.length === 0) return 0;
+  let totalMinutes = 0;
+  let lastIn = null;
+  for (const e of schedule) {
+    if (e.type === "in") {
+      lastIn = e.hour * 60 + e.minute;
+    } else if (e.type === "out" && lastIn !== null) {
+      totalMinutes += (e.hour * 60 + e.minute) - lastIn;
+      lastIn = null;
+    }
+  }
+  return totalMinutes;
+}
+
+// ── Fetch and cache full-day absences ─────────────────
+async function fetchFullDayAbsences() {
+  const cache = await chrome.storage.local.get("cachedAbsences");
+  const now = Date.now();
+  
+  // Return cached data if still valid
+  if (cache.cachedAbsences && 
+      cache.cachedAbsences.timestamp && 
+      (now - cache.cachedAbsences.timestamp) < ABSENCE_CACHE_TTL_MS) {
+    console.log("[Woffuk] Using cached absences");
+    return cache.cachedAbsences.data || {};
+  }
+
+  const token = await getToken();
+  const baseUrl = await getBaseUrl();
+  if (!token) return {};
+
+  const claims = decodeJwtPayload(token);
+  if (!claims?.UserId) return {};
+
+  try {
+    // Fetch requests with pagination
+    let allRequests = [];
+    let page = 1;
+    const pageSize = 50;
+    let hasMore = true;
+
+    while (hasMore) {
+      const url = `${baseUrl}/api/users/${claims.UserId}/requests?page=${page}&pageSize=${pageSize}`;
+      const r = await fetch(url, {
+        headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" }
+      });
+      
+      if (!r.ok) break;
+      
+      const data = await r.json();
+      const requests = Array.isArray(data) ? data : (data.Results || data.Items || []);
+      allRequests = allRequests.concat(requests);
+      
+      // Check if there are more pages
+      hasMore = requests.length === pageSize;
+      page++;
+    }
+
+    // Also get schedules for workday calculation
+    const schedulesData = await migrateScheduleIfNeeded() 
+      || (await chrome.storage.local.get("schedules")).schedules;
+
+    // Build full-day absence map
+    const fullDayAbsences = {};
+    
+    for (const req of allRequests) {
+      // Only accepted requests (status 20)
+      if (req.RequestStatusId !== 20) continue;
+
+      const startDate = req.StartDate?.split("T")[0];
+      if (!startDate) continue;
+      const endDate = req.EndDate?.split("T")[0] || startDate;
+
+      // Get day of week for the start date
+      const startD = new Date(startDate + "T00:00:00");
+      const endD = new Date(endDate + "T00:00:00");
+      const current = new Date(startD);
+
+      while (current <= endD) {
+        const dayOfWeek = current.getDay();
+        const dateKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
+        
+        // Skip weekends
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          // Check if this is a full day absence
+          const schedule = getScheduleForDay(schedulesData, dayOfWeek);
+          const workdayMinutes = getScheduleTotalMinutes(schedule);
+          
+          let isFullDay = false;
+          
+          // Case 1: Day-based request (NumberDaysRequested > 0, no StartTime)
+          if (req.NumberDaysRequested > 0 && (!req.StartTime || req.StartTime === null)) {
+            isFullDay = true;
+          }
+          // Case 2: Hour-based request
+          else if (req.NumberHoursRequested > 0 && req.StartTime && req.EndTime) {
+            const [sh, sm] = req.StartTime.split(":").map(Number);
+            const [eh, em] = req.EndTime.split(":").map(Number);
+            const absenceMinutes = (eh * 60 + em) - (sh * 60 + sm);
+            
+            // Consider full day if absence hours >= 90% of workday
+            if (absenceMinutes >= workdayMinutes * 0.9) {
+              isFullDay = true;
+            }
+          }
+
+          if (isFullDay) {
+            fullDayAbsences[dateKey] = {
+              type: req.AgreementEventName || "Ausencia",
+              hoursRequested: req.NumberHoursRequested || req.NumberDaysRequested
+            };
+          }
+        }
+
+        current.setDate(current.getDate() + 1);
+      }
+    }
+
+    // Cache the result
+    await chrome.storage.local.set({
+      cachedAbsences: {
+        data: fullDayAbsences,
+        timestamp: now
+      }
+    });
+
+    console.log(`[Woffuk] Fetched ${Object.keys(fullDayAbsences).length} full-day absences`);
+    return fullDayAbsences;
+
+  } catch (err) {
+    console.log(`[Woffuk] fetchFullDayAbsences error: ${err.message}`);
+    return {};
+  }
+}
+
+// ── Check if a date has a full-day absence ─────────────
+async function hasFullDayAbsence(dateStr) {
+  const cache = await chrome.storage.local.get("cachedAbsences");
+  if (cache.cachedAbsences?.data?.[dateStr]) {
+    return cache.cachedAbsences.data[dateStr];
+  }
+  // If not in cache, return null (will allow normal check-in)
+  return null;
 }
 
 // ── Migration: old schedule → new schedules format ─────
@@ -69,6 +217,7 @@ async function setupAlarms() {
   const { enabled } = await chrome.storage.local.get("enabled");
   if (!enabled) return;
   chrome.alarms.create("woffu-check", { periodInMinutes: 1 });
+  chrome.alarms.create("woffu-absences", { periodInMinutes: 60 });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -271,6 +420,13 @@ async function getBaseUrl() {
 // ══════════════════════════════════════════════════════════
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  // Handle absence refresh alarm
+  if (alarm.name === "woffu-absences") {
+    console.log("[Woffuk] Refreshing absences cache...");
+    await fetchFullDayAbsences();
+    return;
+  }
+
   if (alarm.name !== "woffu-check") return;
 
   // On-the-fly migration fallback
@@ -295,10 +451,19 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   const days = activeDays || [1, 2, 3, 4, 5];
   if (!days.includes(day)) return;
 
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  // Check for full-day absence
+  const absence = await hasFullDayAbsence(todayStr);
+  if (absence) {
+    console.log(`[Woffuk] Skipping check-in: full-day absence (${absence.type}) on ${todayStr}`);
+    await appendLog("skip", true, `Dia de ausencia completa (${absence.type}) - fichaje omitido`, 0);
+    return;
+  }
+
   const schedule = getScheduleForDay(schedulesData, day);
   if (!schedule || schedule.length === 0) return;
 
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const window = timeWindow ?? DEFAULT_TIME_WINDOW;
   const maxOffset = randomOffset ?? DEFAULT_RANDOM_OFFSET;
   const todayKey = todayStr;
@@ -905,6 +1070,45 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const text = await r.text().catch(() => "");
           sendResponse({ ok: false, error: `HTTP ${r.status}: ${text.slice(0, 200)}` });
         }
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  if (msg.action === "getFullDayAbsences") {
+    (async () => {
+      try {
+        // First, try to get from cache
+        const cache = await chrome.storage.local.get("cachedAbsences");
+        const now = Date.now();
+        
+        if (cache.cachedAbsences?.data && cache.cachedAbsences.timestamp) {
+          const age = now - cache.cachedAbsences.timestamp;
+          // If cache is fresh (< 5 min), return it
+          if (age < 5 * 60 * 1000) {
+            sendResponse({ ok: true, absences: cache.cachedAbsences.data, fromCache: true });
+            return;
+          }
+        }
+        
+        // Fetch fresh data
+        const absences = await fetchFullDayAbsences();
+        sendResponse({ ok: true, absences, fromCache: false });
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  if (msg.action === "refreshAbsences") {
+    (async () => {
+      try {
+        await fetchFullDayAbsences();
+        const cache = await chrome.storage.local.get("cachedAbsences");
+        sendResponse({ ok: true, absences: cache.cachedAbsences?.data || {} });
       } catch (err) {
         sendResponse({ ok: false, error: err.message });
       }
